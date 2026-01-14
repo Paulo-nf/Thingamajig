@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filter Capacitor Calculator</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 40px auto; padding: 0 20px; background-color: #f4f7f9; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; }
+        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        input:disabled { background-color: #f9f9f9; color: #888; border-style: dashed; }
+        button { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
+        button:hover { background-color: #0056b3; }
+        .results { margin-top: 25px; padding: 15px; background-color: #e9ecef; border-radius: 8px; display: none; }
+        .result-item { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #dee2e6; padding-bottom: 4px; }
+        .val { font-family: monospace; font-weight: bold; color: #d63384; font-size: 1.1rem; }
+        .error { color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 6px; margin-top: 15px; display: none; }
+        .formula-box { font-size: 0.8rem; color: #666; margin-top: 20px; font-style: italic; }
+        .verify-box { margin-top: 15px; font-size: 0.85rem; color: #555; border-top: 1px solid #ccc; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Filter Calculator</h2>
+
+    <div class="input-group">
+        <label>R0 (Fixed Resistance)</label>
+        <input type="text" value="1.2k Ω" disabled>
+    </div>
+
+    <div class="input-group">
+        <label>R1 (Fixed Resistance)</label>
+        <input type="text" value="68k Ω" disabled>
+    </div>
+
+    <div class="input-group">
+        <label>Target Frequency F₀ (Hz)</label>
+        <input type="number" id="f0" placeholder="e.g. 1000">
+    </div>
+
+    <div class="input-group">
+        <label>Target Quality Factor (Q)</label>
+        <input type="number" id="q" step="0.001" placeholder="e.g. 0.707">
+    </div>
+
+    <button onclick="calculate()">Calculate Capacitors</button>
+
+    <div id="error-box" class="error"></div>
+
+    <div id="results-box" class="results">
+        <strong>Suggested Capacitor Values:</strong>
+        <div class="result-item" style="margin-top:10px;">
+            <span>C₀:</span>
+            <span id="res-c0" class="val"></span>
+        </div>
+        <div class="result-item">
+            <span>C:</span>
+            <span id="res-c" class="val"></span>
+        </div>
+
+        <div class="verify-box">
+            <strong>Internal Verification:</strong><br>
+            Computed F₀: <span id="ver-f0"></span> Hz<br>
+            Computed Q: <span id="ver-q"></span>
+        </div>
+    </div>
+
+    <div class="formula-box">
+        Derived from: C₀ = 1/(2πR₀QF₀) and C = Q/(2πR₁F₀)
+    </div>
+</div>
+
+<script>
+function formatFarads(val) {
+    if (val >= 1e-6) return (val * 1e6).toFixed(3) + " µF";
+    if (val >= 1e-9) return (val * 1e9).toFixed(3) + " nF";
+    return (val * 1e12).toFixed(3) + " pF";
+}
+
+function calculate() {
+    const R0 = 1200;
+    const R1 = 68000;
+    const f0_input = document.getElementById('f0').value;
+    const q_input = document.getElementById('q').value;
+
+    const f0_target = parseFloat(f0_input);
+    const q_target = parseFloat(q_input);
+
+    const errorBox = document.getElementById('error-box');
+    const resultsBox = document.getElementById('results-box');
+
+    errorBox.style.display = 'none';
+    resultsBox.style.display = 'none';
+
+    if (!f0_target || !q_target || f0_target <= 0 || q_target <= 0) {
+        errorBox.innerText = "Please enter valid positive numbers for Frequency and Q.";
+        errorBox.style.display = 'block';
+        return;
+    }
+
+    // Theoretical Calculations
+    const c0 = 1 / (2 * Math.PI * R0 * q_target * f0_target);
+    const c = q_target / (2 * Math.PI * R1 * f0_target);
+
+    // Validation Check (Plugging back into original formulas)
+    const verified_q = Math.sqrt((c * R1) / (c0 * R0));
+    const verified_f0 = 1 / (2 * Math.PI * Math.sqrt(R0 * R1 * c * c0));
+
+    // Tolerance check
+    if (Math.abs(verified_f0 - f0_target) > (f0_target * 0.01) || Math.abs(verified_q - q_target) > 0.01) {
+        errorBox.innerText = "Error: Calculation consistency check failed.";
+        errorBox.style.display = 'block';
+        return;
+    }
+
+    // Update UI
+    document.getElementById('res-c0').innerText = formatFarads(c0);
+    document.getElementById('res-c').innerText = formatFarads(c);
+    document.getElementById('ver-f0').innerText = verified_f0.toLocaleString(undefined, {maximumFractionDigits: 2});
+    document.getElementById('ver-q').innerText = verified_q.toFixed(4);
+
+    resultsBox.style.display = 'block';
+}
+</script>
+
+</body>
+</html>
